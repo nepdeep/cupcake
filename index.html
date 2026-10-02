@@ -830,7 +830,12 @@ function probeSafe(x, z, maxRn = 0.86) {
     const h = probe(Math.cos(th) * r, Math.sin(th) * r);
     // The mesh is a fine polygon; also require the hit to be inside the true outline
     // (matters in the heart's notch, where mesh chords bulge slightly outward).
-    if (h) { const hth = Math.atan2(h.p.z, h.p.x); if (Math.hypot(h.p.x, h.p.z) <= frostRf(S, F, hth) * 0.97) return h; }
+    // Pieces are lifted along the normal (up to 0.08), so check that point too.
+    if (h) {
+      const ex = h.p.x + h.n.x * 0.08, ez = h.p.z + h.n.z * 0.08;
+      if (Math.hypot(h.p.x, h.p.z) <= frostRf(S, F, Math.atan2(h.p.z, h.p.x)) * 0.97 &&
+          Math.hypot(ex, ez) <= frostRf(S, F, Math.atan2(ez, ex)) * 0.97) return h;
+    }
     r *= 0.8;
   }
   return probe(0, 0) || { p: new V3(0, frostSurfaceY(S, F, 0, 0), 0), n: UP.clone() };
@@ -1144,12 +1149,10 @@ const audio = {
 const LINER_COLORS = ['#ff8fb8', '#7fcaff', '#b49bff', '#6fdcae', '#ffb36b', '#ff7a8a', '#ffd84d', '#5fc9c0', '#f08ff0'];
 const FROST_COLORS = ['#ffc2dc', '#fff1a8', '#c4f0d4', '#d7c8ff', '#bfe4ff', '#ffd2b0', '#8a5a44', '#fffaf5', '#ff9ecf', '#a6f0e6', '#ffb3b3'];
 const CAKE_COLORS = ['#f3cf96', '#9a643f', '#f6b3bf', '#f0d9a6'];
+/** Three liner and three frosting colours, never repeating the previous batch's. */
 function makePalette(prev) {
-  for (let tries = 0; tries < 30; tries++) {
-    const p = { liners: shuffle(LINER_COLORS).slice(0, 3), frosts: shuffle(FROST_COLORS).slice(0, 3), cake: pick(CAKE_COLORS) };
-    if (!prev || (!p.liners.some((c) => prev.liners.includes(c)) && !p.frosts.some((c) => prev.frosts.includes(c)))) return p;
-  }
-  return { liners: shuffle(LINER_COLORS).slice(0, 3), frosts: shuffle(FROST_COLORS).slice(0, 3), cake: pick(CAKE_COLORS) };
+  const fresh = (all, old) => shuffle(all.filter((c) => !old.includes(c))).slice(0, 3);
+  return { liners: fresh(LINER_COLORS, prev ? prev.liners : []), frosts: fresh(FROST_COLORS, prev ? prev.frosts : []), cake: pick(CAKE_COLORS) };
 }
 
 let mode = 'title'; // title | build | serving | parade | batchEnd | transition
@@ -1314,7 +1317,12 @@ function undo() {
 
 /* ---------- player actions ---------- */
 function chooseShape(i) { if (mode !== 'build' || state.shape != null) return; audio.pop(); commit({ shape: i, frost: null, decos: [] }); }
-function chooseFrost(i) { if (mode !== 'build' || state.shape == null || state.frost != null) return; commit({ shape: state.shape, frost: i, decos: [] }); }
+let decoDemoShown = false;
+function chooseFrost(i) {
+  if (mode !== 'build' || state.shape == null || state.frost != null) return;
+  commit({ shape: state.shape, frost: i, decos: [] });
+  if (!decoDemoShown) { decoDemoShown = true; idleDelay = 2; } // show "pick, then tap the cupcake" once, right away
+}
 function selectDeco(i) {
   selectedDeco = i; audio.select();
   trayCards.forEach((c, k) => c.classList.toggle('sel', k === i));
@@ -1619,7 +1627,8 @@ function drawMute() {
 try { audio.muted = localStorage.getItem('cloudcafe-muted') === '1'; } catch (e) { /* storage unavailable */ }
 drawMute();
 muteBtn.addEventListener('click', () => {
-  noteInput(); audio.init(); audio.setMuted(!audio.muted); drawMute();
+  noteInput(); if (mode !== 'title') audio.init(); // sound only ever starts after Play
+  audio.setMuted(!audio.muted); drawMute();
   try { localStorage.setItem('cloudcafe-muted', audio.muted ? '1' : '0'); } catch (e) { /* ignore */ }
   if (!audio.muted) audio.select();
 });
