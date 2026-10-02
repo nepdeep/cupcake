@@ -1,0 +1,19 @@
+{
+  "name": "cloud-cafe",
+  "version": "1.0.0",
+  "description": "Cloud Cafe - a playful 3D cupcake-decorating toy for young children (Three.js + Vite, single index.html)",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host"
+  },
+  "dependencies": {
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "vite": "^8.3.2"
+  },
+  "license": "MIT"
+}
